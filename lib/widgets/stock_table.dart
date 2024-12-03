@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:stockly/screens/details.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:eventsource3/eventsource.dart';
 
 class StockTable extends StatefulWidget {
   @override
@@ -11,41 +12,106 @@ class StockTable extends StatefulWidget {
 class _StockTableState extends State<StockTable>{
   List<Map<String, dynamic>> datas = [];
   bool isLoading = true; // 데이터 로딩 상태
+  EventSource? eventSource; // SSE 연결
 
   @override
   void initState(){
     super.initState();
-    fetchDatas();
+    fetchInitialData();
+    connectToSSE();
   }
 
-  Future<void> fetchDatas() async {
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  // 초기 데이터 fetch
+  Future<void> fetchInitialData() async {
     try {
       final url = Uri.parse('http://localhost.stock-service/api/v1/stockDetails/symbols');
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
-        // UTF-8로 강제 디코딩
         final List<dynamic> data = json.decode(utf8.decode(response.bodyBytes));
 
         setState(() {
           datas = data.map((item) => {
+            "id": item['id'],
             "name": item['name'],
             "symbol": item['symbol'],
             "close": item['close'],
-            "rate" : item['rate'],
-            "rate_price" : item['rate_price']
+            "rate": item['rate'],
+            "rate_price": item['rate_price'],
+            "volume": item['volume'],
           }).toList();
-          isLoading = false; // 로딩 완료
+          isLoading = false;
         });
       } else {
-        throw Exception('Failed to load data');
+        throw Exception('Failed to load initial data');
       }
     } catch (e) {
       setState(() {
         isLoading = false;
       });
-      print('Error fetching companies: $e');
+      print('Error fetching initial data: $e');
     }
+  }
+
+  // SSE 연결 및 실시간 데이터 fetch
+  void connectToSSE() async {
+    try {
+      final url = 'http://localhost.stock-service/api/v1/stockDetails/sse/stream/multiple/symbols?page=1';
+      eventSource = await EventSource.connect(url);
+
+      eventSource?.listen((event) {
+        if (event.data != null) {
+          try {
+            final parsedData = json.decode(event.data!);
+
+
+            if (parsedData != null ) {
+              _updateOrAddData(parsedData[0]);
+            }
+            else {
+              print('Unexpected data format: $parsedData');
+            }
+          } catch (e) {
+            print('Error parsing SSE data: $e');
+          }
+        }
+      });
+    } catch (e) {
+      print('Error connecting to SSE: $e');
+    }
+  }
+
+  // 데이터를 업데이트하거나 추가하는 함수
+  void _updateOrAddData(Map<String, dynamic> newData) {
+    setState(() {
+      final index = datas.indexWhere((item) => item['symbol'] == newData['symbol']);
+      if (index != -1) {
+        // 기존 데이터 업데이트
+        datas[index] = {
+          ...datas[index],
+          "close": newData['close'],
+          "rate": newData['rate'],
+          "rate_price": newData['rate_price'],
+          "volume": newData['volume'],
+        };
+      } else {
+        // 새로운 데이터 추가
+        datas.add({
+          "id": newData['id'],
+          "name": newData['name'],
+          "symbol": newData['symbol'],
+          "close": newData['close'],
+          "rate": newData['rate'],
+          "rate_price": newData['rate_price'],
+          "volume": newData['volume'],
+        });
+      }
+    });
   }
 
   @override
