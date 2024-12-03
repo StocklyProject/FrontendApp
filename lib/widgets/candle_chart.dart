@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:interactive_chart/interactive_chart.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:eventsource3/eventsource.dart';
 
 
 class CandleChart extends StatefulWidget {
@@ -19,14 +20,22 @@ class CandleChart extends StatefulWidget {
 class _CandleChartState extends State<CandleChart> {
   List <CandleData> stockDatas = [];
   bool isLoading = true;  // 로딩 상태를 관리하는 변수
+  EventSource? eventSource; // SSE 연결
 
   @override
   void initState(){
     super.initState();
-    fetchDatas();
+    fetchInitial();
+    connectToSSE();
   }
 
-  Future<void> fetchDatas() async {
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  // 과거 데이터 fetch
+  Future<void> fetchInitial() async {
     try {
       final url = Uri.parse(
           'http://localhost.stock-service/api/v1/stockDetails/historicalFilter?symbol=${widget.symbol}&interval=1d');
@@ -47,9 +56,20 @@ class _CandleChartState extends State<CandleChart> {
           );
         }).toList();
 
+        // 실시간 데이터가 담길 더미 데이터 생성
+        final dummyData = CandleData(
+          timestamp: DateTime.now().millisecondsSinceEpoch,
+          open: 0.0,
+          high: 0.0,
+          low: 0.0,
+          close: 0.0,
+          volume: 0.0,
+        );
+
         // 상태 업데이트
         setState(() {
           stockDatas = parsedData;
+          stockDatas.add(dummyData); // 더미 데이터를 리스트에 추가
           isLoading = false;  // 데이터가 로드되면 로딩 상태를 false로 설정
         });
       } else {
@@ -60,6 +80,50 @@ class _CandleChartState extends State<CandleChart> {
     }
   }
 
+  // SSE 연결 및 실시간 데이터 fetch
+  void connectToSSE() async {
+    try {
+      final url = 'http://localhost.stock-service/api/v1/stockDetails/sse/stream/${widget.symbol}';
+      eventSource = await EventSource.connect(url);
+
+      eventSource?.listen((event) {
+        if (event.data != null) {
+          try {
+            final parsedData = json.decode(event.data!);
+
+            if (parsedData != null ) {
+              _updateOrAddData(parsedData);
+            }
+            else {
+              print('Unexpected data format: $parsedData');
+            }
+          } catch (e) {
+            print('Error parsing SSE data: $e');
+          }
+        }
+      });
+    } catch (e) {
+      print('Error connecting to SSE: $e');
+    }
+  }
+
+  // 데이터를 업데이트 하는 함수
+  void _updateOrAddData(Map<String, dynamic> newData) {
+    setState(() {
+      if (newData != null ) {
+
+        // 배열의 마지막을 실시간 데이터로 업데이트
+        stockDatas[stockDatas.length-1] = CandleData(
+          timestamp: DateTime.parse(newData['date']).millisecondsSinceEpoch,
+          open: newData['open'].toDouble(),
+          high: newData['high'].toDouble(),
+          low: newData['low'].toDouble(),
+          close: newData['close'].toDouble(),
+          volume: newData['volume'].toDouble(),
+        );
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
