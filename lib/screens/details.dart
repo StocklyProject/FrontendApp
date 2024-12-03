@@ -3,6 +3,9 @@ import '../widgets/candle_chart.dart';
 import '../widgets/order_book.dart';
 import '../screens/buy.dart';
 import '../screens/sell.dart';
+import 'package:http/http.dart' as http;
+import 'package:eventsource3/eventsource.dart';
+import 'dart:convert';
 
 class DetailsScreen extends StatefulWidget {
   final String symbol;
@@ -26,10 +29,72 @@ class DetailsScreen extends StatefulWidget {
 }
 
 class _DetailsScreenState extends State<DetailsScreen> {
-  // 선택된 항목을 추적하는 변수
+  bool isLoading = true;  // 로딩 상태를 관리하는 변수
+  EventSource? eventSource; // SSE 연결
+
+  // 상단 주식 정보 변수
+  int price = 0;
+  double rate = 0.0;
+  int rate_price = 0;
+
+  // 하위 widget에 넘겨줄 실시간 데이터 정보 관리하는 변수
+  Map<String, dynamic> stockData = {};
+
+  // 토글 버튼 상태 추적하는 변수
   int _selectedIndex = 0;  // 0: 차트, 1: 호가
   int _selectedFilter = 1; // 0: 분, 1: 일, 2: 주, 3:월, 4:년
   String dropdownValue = '1분';
+
+  @override
+  void initState(){
+    super.initState();
+    price = widget.close.toInt();
+    rate = widget.rate;
+    rate_price = widget.ratePrice.toInt();
+    connectToSSE();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  // SSE 연결 및 실시간 데이터 fetch
+  void connectToSSE() async {
+    try {
+      final url = 'http://localhost.stock-service/api/v1/stockDetails/sse/stream/${widget.symbol}';
+      eventSource = await EventSource.connect(url);
+
+      eventSource?.listen((event) {
+        if (event.data != null) {
+          try {
+            final parsedData = json.decode(event.data!);
+
+            if (parsedData != null ) {
+              if (mounted) {
+                setState(() {
+                  // 하위 위젯에 넘겨줄 데이터 업데이트
+                  stockData = parsedData;
+
+                  // 상단 주식 정보 데이터 업데이트
+                  price = parsedData['close'].toInt();
+                  rate = parsedData['rate'];
+                  rate_price = parsedData['rate_price'].toInt();
+                });
+              }
+            }
+            else {
+              print('Unexpected data format: $parsedData');
+            }
+          } catch (e) {
+            print('Error parsing SSE data: $e');
+          }
+        }
+      });
+    } catch (e) {
+      print('Error connecting to SSE: $e');
+    }
+  }
 
 
   @override
@@ -62,15 +127,15 @@ class _DetailsScreenState extends State<DetailsScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 5),
-                  child: Text('${widget.close}원', style: const TextStyle(fontSize: 25, fontWeight: FontWeight.bold)), // widget 사용
+                  child: Text('${_formatCurrency(price)}원', style: const TextStyle(fontSize: 25, fontWeight: FontWeight.bold)), // widget 사용
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 5),
                   child: Text(
-                    '${widget.ratePrice}원 (${widget.rate}%)',
+                    '${_formatCurrency(rate_price)}원 (${rate}%)',
                     style: TextStyle(
                       fontSize: 18,
-                      color: (widget.ratePrice > 0 ? Colors.red : Colors.blue), // widget 사용
+                      color: (rate_price > 0 ? Colors.red : Colors.blue), // widget 사용
                     ),
                   ),
                 ),
@@ -167,7 +232,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
             // 선택된 버튼에 따라 다르게 표시되는 자식 요소
             Expanded(
               child: _selectedIndex == 0
-                  ? CandleChart(symbol: widget.symbol)  // 차트 화면
+                  ? CandleChart(symbol: widget.symbol, newData: stockData)  // 차트 화면
                   : OrderBook(symbol: widget.symbol),  // 호가 화면, 이 위젯은 별도로 구현 필요
             ),
 
@@ -394,4 +459,12 @@ class _DetailsScreenState extends State<DetailsScreen> {
       )
     );
   }
+ // 가격 숫자에 점 찍어주는 함수
+  String _formatCurrency(int value) {
+    return value.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+          (match) => ',',
+    );
+  }
+
 }

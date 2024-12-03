@@ -69,7 +69,6 @@ class _StockTableState extends State<StockTable>{
           try {
             final parsedData = json.decode(event.data!);
 
-
             if (parsedData != null ) {
               _updateOrAddData(parsedData[0]);
             }

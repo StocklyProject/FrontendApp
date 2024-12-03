@@ -7,10 +7,12 @@ import 'package:eventsource3/eventsource.dart';
 
 class CandleChart extends StatefulWidget {
   final String symbol;
+  final Map<String, dynamic>? newData; // 상위 위젯에서 받은 실시간 주식 데이터
 
   const CandleChart({
     Key? key,
     required this.symbol,
+    this.newData,
   }) : super(key: key);
 
   @override
@@ -26,7 +28,7 @@ class _CandleChartState extends State<CandleChart> {
   void initState(){
     super.initState();
     fetchInitial();
-    connectToSSE();
+    //connectToSSE();
   }
 
   @override
@@ -80,30 +82,16 @@ class _CandleChartState extends State<CandleChart> {
     }
   }
 
-  // SSE 연결 및 실시간 데이터 fetch
-  void connectToSSE() async {
-    try {
-      final url = 'http://localhost.stock-service/api/v1/stockDetails/sse/stream/${widget.symbol}';
-      eventSource = await EventSource.connect(url);
+  // 상위 위젯에서 newData가 변경된 경우 실행
+  @override
+  void didUpdateWidget(covariant CandleChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
 
-      eventSource?.listen((event) {
-        if (event.data != null) {
-          try {
-            final parsedData = json.decode(event.data!);
-
-            if (parsedData != null ) {
-              _updateOrAddData(parsedData);
-            }
-            else {
-              print('Unexpected data format: $parsedData');
-            }
-          } catch (e) {
-            print('Error parsing SSE data: $e');
-          }
-        }
-      });
-    } catch (e) {
-      print('Error connecting to SSE: $e');
+    // newData가 업데이트된 경우, 상태 업데이트
+    if (widget.newData != oldWidget.newData) {
+      if (widget.newData != null) {
+        _updateOrAddData(widget.newData!);
+      }
     }
   }
 
