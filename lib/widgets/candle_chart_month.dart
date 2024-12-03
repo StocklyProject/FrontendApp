@@ -5,21 +5,21 @@ import 'dart:convert';
 import 'package:eventsource3/eventsource.dart';
 
 
-class CandleChart extends StatefulWidget {
+class CandleChartMonth extends StatefulWidget {
   final String symbol;
   final Map<String, dynamic>? newData; // 상위 위젯에서 받은 실시간 주식 데이터
 
-  const CandleChart({
+  const CandleChartMonth({
     Key? key,
     required this.symbol,
     this.newData,
   }) : super(key: key);
 
   @override
-  _CandleChartState createState() => _CandleChartState();
+  _CandleChartMonthState createState() => _CandleChartMonthState();
 }
 
-class _CandleChartState extends State<CandleChart> {
+class _CandleChartMonthState extends State<CandleChartMonth> {
   List <CandleData> stockDatas = [];
   bool isLoading = true;  // 로딩 상태를 관리하는 변수
   EventSource? eventSource; // SSE 연결
@@ -40,7 +40,7 @@ class _CandleChartState extends State<CandleChart> {
   Future<void> fetchInitial() async {
     try {
       final url = Uri.parse(
-          'http://localhost.stock-service/api/v1/stockDetails/historicalFilter?symbol=${widget.symbol}&interval=1d');
+          'http://localhost.stock-service/api/v1/stockDetails/historicalFilter?symbol=${widget.symbol}&interval=1m');
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
@@ -49,7 +49,7 @@ class _CandleChartState extends State<CandleChart> {
         // JSON 데이터를 CandleData 리스트로 변환
         final parsedData = data.map((item) {
           return CandleData(
-            timestamp: DateTime.parse(item['date']).millisecondsSinceEpoch,
+            timestamp: DateTime.parse('${item['date']}-01').millisecondsSinceEpoch,
             open: item['open'].toDouble(),
             high: item['high'].toDouble(),
             low: item['low'].toDouble(),
@@ -84,7 +84,7 @@ class _CandleChartState extends State<CandleChart> {
 
   // 상위 위젯에서 newData가 변경된 경우 실행
   @override
-  void didUpdateWidget(covariant CandleChart oldWidget) {
+  void didUpdateWidget(covariant CandleChartMonth oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     // newData가 업데이트된 경우, 상태 업데이트
@@ -134,60 +134,6 @@ class _CandleChartState extends State<CandleChart> {
     );
   }
 
-/** Example styling */
-// style: ChartStyle(
-//   priceGainColor: Colors.teal[200]!,
-//   priceLossColor: Colors.blueGrey,
-//   volumeColor: Colors.teal.withOpacity(0.8),
-//   trendLineStyles: [
-//     Paint()
-//       ..strokeWidth = 2.0
-//       ..strokeCap = StrokeCap.round
-//       ..color = Colors.deepOrange,
-//     Paint()
-//       ..strokeWidth = 4.0
-//       ..strokeCap = StrokeCap.round
-//       ..color = Colors.orange,
-//   ],
-//   priceGridLineColor: Colors.blue[200]!,
-//   priceLabelStyle: TextStyle(color: Colors.blue[200]),
-//   timeLabelStyle: TextStyle(color: Colors.blue[200]),
-//   selectionHighlightColor: Colors.red.withOpacity(0.2),
-//   overlayBackgroundColor: Colors.red[900]!.withOpacity(0.6),
-//   overlayTextStyle: TextStyle(color: Colors.red[100]),
-//   timeLabelHeight: 32,
-//   volumeHeightFactor: 0.2, // volume area is 20% of total height
-// ),
-/** Customize axis labels */
-// timeLabel: (timestamp, visibleDataCount) => "📅",
-// priceLabel: (price) => "${price.round()} 💎",
-/** Customize overlay (tap and hold to see it)
- ** Or return an empty object to disable overlay info. */
-// overlayInfo: (candle) => {
-//   "💎": "🤚    ",
-//   "Hi": "${candle.high?.toStringAsFixed(2)}",
-//   "Lo": "${candle.low?.toStringAsFixed(2)}",
-// },
-/** Callbacks */
-// onTap: (candle) => print("user tapped on $candle"),
-// onCandleResize: (width) => print("each candle is $width wide"),
-
-
-//   _computeTrendLines() {
-//     final ma7 = CandleData.computeMA(_data, 7);
-//     final ma30 = CandleData.computeMA(_data, 30);
-//     final ma90 = CandleData.computeMA(_data, 90);
-//
-//     for (int i = 0; i < _data.length; i++) {
-//       _data[i].trends = [ma7[i], ma30[i], ma90[i]];
-//     }
-//   }
-//
-//   _removeTrendLines() {
-//     for (final data in _data) {
-//       data.trends = [];
-//     }
-//   }
 }
 
 

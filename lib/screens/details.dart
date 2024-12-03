@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
-import '../widgets/candle_chart.dart';
+import '../widgets/candle_chart_min.dart';
+import '../widgets/candle_chart_day.dart';
+import '../widgets/candle_chart_week.dart';
+import '../widgets/candle_chart_month.dart';
+import '../widgets/candle_chart_year.dart';
 import '../widgets/order_book.dart';
 import '../screens/buy.dart';
 import '../screens/sell.dart';
-import 'package:http/http.dart' as http;
 import 'package:eventsource3/eventsource.dart';
 import 'dart:convert';
 
@@ -230,16 +233,36 @@ class _DetailsScreenState extends State<DetailsScreen> {
             SizedBox(height: 10),
 
             // 선택된 버튼에 따라 다르게 표시되는 자식 요소
+            // Expanded(
+            //   child: _selectedIndex == 0
+            //       ? CandleChartDay(symbol: widget.symbol, newData: stockData)
+            //       : OrderBook(symbol: widget.symbol),  // 호가 화면
+            // ),
             Expanded(
               child: _selectedIndex == 0
-                  ? CandleChart(symbol: widget.symbol, newData: stockData)  // 차트 화면
-                  : OrderBook(symbol: widget.symbol),  // 호가 화면, 이 위젯은 별도로 구현 필요
+                  ? Builder(
+                builder: (_) {
+                  switch (_selectedFilter) {
+                    case 0:
+                      return CandleChartMin(symbol: widget.symbol, newData: stockData);
+                    case 1:
+                      return CandleChartDay(symbol: widget.symbol, newData: stockData);
+                    case 2:
+                      return CandleChartWeek(symbol: widget.symbol, newData: stockData);
+                    case 3:
+                      return CandleChartMonth(symbol: widget.symbol, newData: stockData);
+                    case 4:
+                      return CandleChartYear(symbol: widget.symbol, newData: stockData);
+                    default:
+                      return CandleChartDay(symbol: widget.symbol, newData: stockData); // 기본값
+                  }
+                },
+              )
+                  : OrderBook(symbol: widget.symbol), // 호가 화면
             ),
 
 
-
             SizedBox(height: 10),
-
 
 
             // 분, 일, 주, 월, 년 필터링 버튼
